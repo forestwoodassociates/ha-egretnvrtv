@@ -94,6 +94,7 @@ CONF_PIN = "pin"
 ERROR_CANNOT_CONNECT = "cannot_connect"
 ERROR_INVALID_PIN = "invalid_pin"
 ERROR_NO_LOCAL_URL = "no_local_url"
+ERROR_OVERLAY_PERMISSION_NOT_GRANTED = "overlay_permission_not_granted"
 
 
 class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -337,6 +338,15 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
         except (aiohttp.ClientError, TimeoutError) as err:
             _LOGGER.debug("Could not reach TV at %s:%s: %s", self._host, self._port, err)
             return {"base": ERROR_CANNOT_CONNECT}
+
+        # The TV already generated and is holding a real PIN at this point, but its own
+        # overlay window (the only place it could show one) silently does nothing without
+        # this permission — proceeding to the "enter the code" step would just leave the user
+        # stuck looking at a TV with nothing on screen to read. Defaults to True for a TV
+        # running an older build that doesn't send this field yet, so pairing isn't blocked on
+        # a check that build simply can't answer.
+        if not data.get("overlay_permission_granted", True):
+            return {"base": ERROR_OVERLAY_PERMISSION_NOT_GRANTED}
 
         self._device_id = str(data.get(CONF_DEVICE_ID) or f"{self._host}:{self._port}")
         self._device_name = str(data.get(CONF_DEVICE_NAME) or self._device_name or self._host)
