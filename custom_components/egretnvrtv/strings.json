@@ -47,7 +47,7 @@
       "cannot_connect": "Could not reach the TV. Make sure it's on the same network and try again.",
       "invalid_pin": "That code didn't match, or it expired. The TV is showing a new one — enter that instead.",
       "no_local_url": "Home Assistant doesn't have a local URL configured (Settings > System > Network) — needed so the TV knows where to reach this instance.",
-      "overlay_permission_not_granted": "This TV hasn't granted the \"draw over other apps\" permission yet, so it can't display the pairing code on screen. On the TV, grant it (Android Settings > Apps > Egret NVR TV > Display over other apps), then try again."
+      "overlay_permission_not_granted": "This TV hasn't granted the \"draw over other apps\" permission yet, so it can't display the pairing code on screen. On the TV, run the Setup Wizard to grant it, then try again."
     },
     "abort": {
       "already_configured": "This TV is already configured."
