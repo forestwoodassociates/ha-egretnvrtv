@@ -1,0 +1,12 @@
+{
+  "domain": "egretnvrtv",
+  "name": "Egret NVR TV",
+  "codeowners": ["@daverein"],
+  "config_flow": true,
+  "documentation": "https://github.com/daverein/ha-egretnvrtv",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/daverein/ha-egretnvrtv/issues",
+  "requirements": [],
+  "version": "0.4.0",
+  "zeroconf": ["_egretnvrtv._tcp.local."]
+}

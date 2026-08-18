@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "zeroconf_confirm": {
+        "title": "Set up Egret NVR TV",
+        "description": "Found \"{name}\" on your network.",
+        "data": {
+          "mqtt_topic_prefix": "Frigate MQTT topic prefix (leave default unless you changed it in Frigate's own config)",
+          "subscribe_to_frigate_events": "Subscribe to Frigate events (leave unchecked if a \"Notifications for Android TV\" blueprint already pushes to this TV — enabling both shows every event twice)",
+          "register_companion_app": "Register as a Home Assistant companion app (lets it show up as a notify target in blueprints)",
+          "companion_device_name": "Companion app device name (only used if registering above)"
+        }
+      },
+      "user": {
+        "title": "Set up Egret NVR TV",
+        "description": "Enter the TV's address if it wasn't found automatically.",
+        "data": {
+          "host": "Host or IP address",
+          "port": "Port",
+          "mqtt_topic_prefix": "Frigate MQTT topic prefix (leave default unless you changed it in Frigate's own config)",
+          "subscribe_to_frigate_events": "Subscribe to Frigate events (leave unchecked if a \"Notifications for Android TV\" blueprint already pushes to this TV or you plan on using the companion app support for notification — enabling both shows every event twice)",
+          "register_companion_app": "Register as a Home Assistant companion app (lets it show up as a notify target in blueprints)",
+          "companion_device_name": "Companion app device name (only used if registering above)"
+        }
+      },
+      "alert_settings": {
+        "title": "Alert appearance & history",
+        "description": "How alerts should look on \"{name}\", and how much notification history to keep.",
+        "data": {
+          "alert_position": "Alert position on screen",
+          "alert_size": "Alert text/image size",
+          "alert_duration_seconds": "Alert duration (seconds)",
+          "play_clips_inline": "Play video clips inline in the alert popup (instead of full-screen)",
+          "save_all_notifications": "Save every notification to history (not just ones with a stable event ID)",
+          "history_size": "Notification history size to keep"
+        }
+      },
+      "pin": {
+        "title": "Enter the code shown on the TV",
+        "description": "\"{name}\" is showing a pairing code on screen. Enter it here to finish connecting.",
+        "data": {
+          "pin": "Pairing code"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the TV. Make sure it's on the same network and try again.",
+      "invalid_pin": "That code didn't match, or it expired. The TV is showing a new one — enter that instead.",
+      "no_local_url": "Home Assistant doesn't have a local URL configured (Settings > System > Network) — needed so the TV knows where to reach this instance."
+    },
+    "abort": {
+      "already_configured": "This TV is already configured."
+    }
+  }
+}
