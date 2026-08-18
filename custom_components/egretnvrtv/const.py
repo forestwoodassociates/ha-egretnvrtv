@@ -31,7 +31,7 @@ DEFAULT_COMPANION_DEVICE_NAME_BASE = "Egret NVR TV"
 # setup wizard and Home Assistant settings card already offer; collected here so pairing
 # doesn't leave it at whatever it happened to default to.
 CONF_SUBSCRIBE_TO_FRIGATE_EVENTS = "subscribe_to_frigate_events"
-DEFAULT_SUBSCRIBE_TO_FRIGATE_EVENTS = True
+DEFAULT_SUBSCRIBE_TO_FRIGATE_EVENTS = False
 
 # Alert appearance — mirrors the TV's own "Alert Configuration" card/wizard step
 # (NotificationConfigDialog.java, NotificationDefaultsPreferences.java). Label strings match
