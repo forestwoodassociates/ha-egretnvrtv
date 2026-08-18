@@ -1,8 +1,8 @@
 # <img src="custom_components/egretnvrtv/brand/dark_icon.png" width="48"> Egret NVR TV (Home Assistant integration)
 
-A Home Assistant custom integration that finds an [Egret NVR TV](https://github.com/daverein/HATVNotifications) Android TV app on your local network and pairs it with this Home Assistant instance — no Long-Lived Access Token to generate and copy, no server address to type on the TV's remote.
+A Home Assistant custom integration that finds an [Egret NVR TV](https://github.com/forestwoodassociates/HATVNotifications) Android TV app on your local network and pairs it with this Home Assistant instance — no Long-Lived Access Token to generate and copy, no server address to type on the TV's remote.
 
-[![Open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=daverein&repository=ha-egretnvrtv&category=integration)
+[![Open this repository in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=forestwoodassociates&repository=ha-egretnvrtv&category=integration)
 
 Requires [HACS](https://hacs.xyz/) already installed on your Home Assistant instance — the button opens HACS's "Add custom repository" dialog pre-filled with this repo; you still confirm and hit Download there.
 
