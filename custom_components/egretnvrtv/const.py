@@ -46,9 +46,14 @@ CONF_ALERT_SIZE = "alert_size"
 ALERT_SIZE_OPTIONS = ["Small", "Medium", "Large", "Max"]
 DEFAULT_ALERT_SIZE = "Medium"
 
+# String-valued (not int) deliberately — see _alert_settings_schema()'s own comment in
+# config_flow.py for why an int-valued vol.In() select silently fails to show any option as
+# pre-selected in Home Assistant's own radio-group form control. The TV's own HTTP endpoints
+# already tolerate a numeric string here (org.json's optInt() parses it fine), so there's no
+# need to convert back to int anywhere in this integration.
 CONF_ALERT_DURATION_SECONDS = "alert_duration_seconds"
-ALERT_DURATION_OPTIONS = [10, 15, 20, 25, 30]
-DEFAULT_ALERT_DURATION_SECONDS = 20
+ALERT_DURATION_OPTIONS = ["10", "15", "20", "25", "30"]
+DEFAULT_ALERT_DURATION_SECONDS = "20"
 
 # Whether a clip plays inline (muted) right in the alert popup, vs. just a snapshot + play
 # icon that opens the full-screen player on demand.
@@ -61,9 +66,10 @@ DEFAULT_PLAY_CLIPS_INLINE = False
 CONF_SAVE_ALL_NOTIFICATIONS = "save_all_notifications"
 DEFAULT_SAVE_ALL_NOTIFICATIONS = False
 
+# String-valued for the same reason as ALERT_DURATION_OPTIONS above.
 CONF_HISTORY_SIZE = "history_size"
-HISTORY_SIZE_OPTIONS = [100, 250, 500, 750, 1000]
-DEFAULT_HISTORY_SIZE = 100
+HISTORY_SIZE_OPTIONS = ["100", "250", "500", "750", "1000"]
+DEFAULT_HISTORY_SIZE = "100"
 
 # The per-config-entry Home Assistant webhook this integration owns, generated during
 # pairing and handed to the TV in the /ha_pair/complete payload — see __init__.py. Distinct

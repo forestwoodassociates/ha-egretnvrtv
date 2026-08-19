@@ -119,10 +119,10 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
         self._subscribe_to_frigate_events: bool = DEFAULT_SUBSCRIBE_TO_FRIGATE_EVENTS
         self._alert_position: str = DEFAULT_ALERT_POSITION
         self._alert_size: str = DEFAULT_ALERT_SIZE
-        self._alert_duration_seconds: int = DEFAULT_ALERT_DURATION_SECONDS
+        self._alert_duration_seconds: str = DEFAULT_ALERT_DURATION_SECONDS
         self._play_clips_inline: bool = DEFAULT_PLAY_CLIPS_INLINE
         self._save_all_notifications: bool = DEFAULT_SAVE_ALL_NOTIFICATIONS
-        self._history_size: int = DEFAULT_HISTORY_SIZE
+        self._history_size: str = DEFAULT_HISTORY_SIZE
         self._webhook_id: str | None = None
 
     async def async_step_zeroconf(
@@ -376,20 +376,22 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_ALERT_SIZE,
                     default=defaults.get(CONF_ALERT_SIZE, DEFAULT_ALERT_SIZE),
                 ): vol.In(ALERT_SIZE_OPTIONS),
-                # vol.Coerce(int) first: a plain vol.In() over an int list, with no explicit
-                # selector, can round-trip through the frontend as a string — harmless for the
-                # TV (org.json's optInt() parses a numeric string just fine) but it means the
-                # *stored* value in this entry's data could be a str, and vol.In() itself
-                # doesn't coerce, only validates membership. That silently breaks pre-selecting
-                # the right option next time this same form (e.g. Reconfigure) is redisplayed
-                # with that stored value as the default — "20" != 20, so nothing matches.
-                # Coercing first guarantees an int actually gets stored, so redisplay works.
+                # String-valued options (ALERT_DURATION_OPTIONS, see const.py), not int —
+                # Home Assistant's frontend renders a short vol.In() select as a radio-group,
+                # and that control's own "which option is checked" comparison silently fails
+                # to match an int-valued default against int-valued options (confirmed by
+                # reading home-assistant/frontend's ha-selector-select.ts and the underlying
+                # @home-assistant/webawesome radio-group component — nothing in this
+                # integration can fix that frontend behavior). str() wraps the default lookup
+                # so it's always a string regardless of where it came from — the TV's
+                # /ha_pair/status endpoint returns this as a JSON number, and older saved
+                # entries may still hold an int from before this was string-typed.
                 vol.Required(
                     CONF_ALERT_DURATION_SECONDS,
-                    default=defaults.get(
+                    default=str(defaults.get(
                         CONF_ALERT_DURATION_SECONDS, DEFAULT_ALERT_DURATION_SECONDS
-                    ),
-                ): vol.All(vol.Coerce(int), vol.In(ALERT_DURATION_OPTIONS)),
+                    )),
+                ): vol.In(ALERT_DURATION_OPTIONS),
                 vol.Required(
                     CONF_PLAY_CLIPS_INLINE,
                     default=defaults.get(CONF_PLAY_CLIPS_INLINE, DEFAULT_PLAY_CLIPS_INLINE),
@@ -409,12 +411,12 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_SAVE_ALL_NOTIFICATIONS, DEFAULT_SAVE_ALL_NOTIFICATIONS
                     ),
                 ): bool,
-                # See CONF_ALERT_DURATION_SECONDS's own comment above for why vol.Coerce(int)
-                # comes first.
+                # See CONF_ALERT_DURATION_SECONDS's own comment above for why this is
+                # string-valued and wrapped in str().
                 vol.Required(
                     CONF_HISTORY_SIZE,
-                    default=defaults.get(CONF_HISTORY_SIZE, DEFAULT_HISTORY_SIZE),
-                ): vol.All(vol.Coerce(int), vol.In(HISTORY_SIZE_OPTIONS)),
+                    default=str(defaults.get(CONF_HISTORY_SIZE, DEFAULT_HISTORY_SIZE)),
+                ): vol.In(HISTORY_SIZE_OPTIONS),
             }
         )
 
