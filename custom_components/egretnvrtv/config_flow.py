@@ -88,6 +88,7 @@ from .const import (
     HISTORY_SIZE_OPTIONS,
     PAIR_COMPLETE_PATH,
     PAIR_START_PATH,
+    PAIR_UPDATE_PATH,
     REQUEST_TIMEOUT_SECONDS,
 )
 
@@ -190,6 +191,60 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=self._user_schema(
                 {CONF_COMPANION_DEVICE_NAME: self._default_companion_device_name()}
             ),
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Update an already-paired TV's settings without re-pairing.
+
+        Deliberately no PIN, unlike the pairing flow above — a PIN's whole purpose is
+        proving physical presence at the *first* pairing, when nothing else vouches for
+        whoever's submitting the form. Re-demanding that here would just be friction with no
+        real security gain: this can only ever reach a TV this Home Assistant instance
+        already successfully paired with once (see PAIR_UPDATE_PATH), over the same
+        local-network-only listener the rest of this integration already trusts by
+        construction — the same trust level /ha_lock_config's own live push already relies
+        on. Connection identity (host/port) and the one-shot companion-app registration
+        aren't offered here — see this method's own scope: everything else pairing collects.
+        """
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            session = async_get_clientsession(self.hass)
+            try:
+                async with session.post(
+                    f"http://{entry.data[CONF_HOST]}:{entry.data[CONF_PORT]}{PAIR_UPDATE_PATH}",
+                    json={
+                        CONF_MQTT_TOPIC_PREFIX: user_input[CONF_MQTT_TOPIC_PREFIX],
+                        CONF_SUBSCRIBE_TO_FRIGATE_EVENTS: user_input[CONF_SUBSCRIBE_TO_FRIGATE_EVENTS],
+                        CONF_ALERT_POSITION: user_input[CONF_ALERT_POSITION],
+                        CONF_ALERT_SIZE: user_input[CONF_ALERT_SIZE],
+                        CONF_ALERT_DURATION_SECONDS: user_input[CONF_ALERT_DURATION_SECONDS],
+                        CONF_PLAY_CLIPS_INLINE: user_input[CONF_PLAY_CLIPS_INLINE],
+                        CONF_SAVE_ALL_NOTIFICATIONS: user_input[CONF_SAVE_ALL_NOTIFICATIONS],
+                        CONF_HISTORY_SIZE: user_input[CONF_HISTORY_SIZE],
+                    },
+                    timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS),
+                ) as resp:
+                    resp.raise_for_status()
+            except (aiohttp.ClientError, TimeoutError) as err:
+                _LOGGER.debug(
+                    "Could not push updated settings to %s:%s: %s",
+                    entry.data[CONF_HOST], entry.data[CONF_PORT], err,
+                )
+                errors["base"] = ERROR_CANNOT_CONNECT
+            else:
+                return self.async_update_reload_and_abort(entry, data_updates=user_input)
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self._reconfigure_schema(user_input or entry.data),
+            errors=errors,
+            description_placeholders={
+                "name": entry.data.get(CONF_DEVICE_NAME) or entry.title
+            },
         )
 
     def _capture_connect_input(self, user_input: dict[str, Any]) -> None:
@@ -322,6 +377,29 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                 ): vol.In(HISTORY_SIZE_OPTIONS),
             }
         )
+
+    @classmethod
+    def _reconfigure_schema(cls, defaults: dict[str, Any] | None = None) -> vol.Schema:
+        # One combined screen, unlike the alert_settings/history_settings split above — that
+        # split exists specifically so a pairing error doesn't require scrolling past a wall
+        # of fields to see, which doesn't apply here (no PIN step, and any /ha_pair/update
+        # failure shows on this same, only, screen regardless of its length).
+        defaults = defaults or {}
+        schema = {
+            vol.Required(
+                CONF_MQTT_TOPIC_PREFIX,
+                default=defaults.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+            ): str,
+            vol.Required(
+                CONF_SUBSCRIBE_TO_FRIGATE_EVENTS,
+                default=defaults.get(
+                    CONF_SUBSCRIBE_TO_FRIGATE_EVENTS, DEFAULT_SUBSCRIBE_TO_FRIGATE_EVENTS
+                ),
+            ): bool,
+        }
+        schema.update(cls._alert_settings_schema(defaults).schema)
+        schema.update(cls._history_settings_schema(defaults).schema)
+        return vol.Schema(schema)
 
     @classmethod
     def _user_schema(cls, defaults: dict[str, Any] | None = None) -> vol.Schema:

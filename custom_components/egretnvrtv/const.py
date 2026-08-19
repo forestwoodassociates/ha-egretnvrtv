@@ -119,6 +119,10 @@ def signal_update(entry_id: str) -> str:
 PAIR_START_PATH = "/ha_pair/start"
 PAIR_COMPLETE_PATH = "/ha_pair/complete"
 
+# TV-side route the "Reconfigure" flow pushes settings updates to on an already-paired TV —
+# no PIN involved, see EgretNvrTvConfigFlow.async_step_reconfigure()'s own doc comment.
+PAIR_UPDATE_PATH = "/ha_pair/update"
+
 # TV-side route the lock switch pushes its state to for an immediate effect — see switch.py.
 LOCK_CONFIG_PATH = "/ha_lock_config"
 

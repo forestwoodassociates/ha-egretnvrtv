@@ -47,6 +47,20 @@
         "data": {
           "pin": "Pairing code"
         }
+      },
+      "reconfigure": {
+        "title": "Update Egret NVR TV settings",
+        "description": "Update settings for \"{name}\" — no pairing code needed, this TV already trusts this Home Assistant instance.",
+        "data": {
+          "mqtt_topic_prefix": "Frigate MQTT topic prefix (leave default unless you changed it in Frigate's own config)",
+          "subscribe_to_frigate_events": "Subscribe to Frigate events (leave unchecked if a \"Notifications for Android TV\" blueprint already pushes to this TV — enabling both shows every event twice)",
+          "alert_position": "Alert position on screen",
+          "alert_size": "Alert text/image size",
+          "alert_duration_seconds": "Alert duration (seconds)",
+          "play_clips_inline": "Play video clips inline in the alert popup (instead of full-screen). Pressing arrow up will switch to fullscreen during playback",
+          "save_all_notifications": "Save every notification to history (not just ones with a stable event ID that Frigate provides)",
+          "history_size": "Notification history size to keep"
+        }
       }
     },
     "error": {
@@ -56,7 +70,8 @@
       "overlay_permission_not_granted": "This TV hasn't granted the \"draw over other apps\" permission yet, so it can't display the pairing code on screen. On the TV, run the Setup Wizard to grant it, then try again."
     },
     "abort": {
-      "already_configured": "This TV is already configured."
+      "already_configured": "This TV is already configured.",
+      "reconfigure_successful": "Settings updated."
     }
   }
 }
