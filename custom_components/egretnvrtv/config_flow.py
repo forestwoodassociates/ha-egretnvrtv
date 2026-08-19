@@ -7,21 +7,25 @@ Pairing exchange (see the TV app's NotificationHttpServer.java for the other sid
    Frigate MQTT topic prefix, whether to subscribe to Frigate's realtime events over this
    connection, and whether to register as a Home Assistant companion app (plus its device
    name if so).
-2. The "Alert & History" screen (alert_settings) collects default alert position/size/
-   duration, whether clips play inline in the popup, and history retention (save-all + how
-   many to keep) — split into its own screen rather than piled onto the Connect screen, so
-   neither one is an overwhelming wall of fields. Everything the TV's own setup wizard would
-   otherwise ask for on-device ends up collected across these two screens.
-3. Submitting alert_settings is what actually POSTs to the TV's `/ha_pair/start` — which
+2. The "Alert Appearance" screen (alert_settings) collects default alert position/size/
+   duration and whether clips play inline in the popup — split into its own screen rather
+   than piled onto the Connect screen, so neither one is an overwhelming wall of fields.
+3. The "Notification History" screen (history_settings) collects history retention (save-all
+   + how many to keep) — kept separate from alert_settings (rather than combined into one
+   six-field screen, as it briefly was) specifically so that if pairing fails right after
+   this screen (see below), the error appears on a short two-field form instead of requiring
+   a scroll back up past four other fields to see it. Everything the TV's own setup wizard
+   would otherwise ask for on-device ends up collected across these three screens.
+4. Submitting history_settings is what actually POSTs to the TV's `/ha_pair/start` — which
    makes the TV display a short PIN on-screen and returns its stable device_id/device_name so
    this flow can dedupe/title the entry without trusting zeroconf TXT records (best-effort
    and inconsistent across OEM Android TV builds). Deliberately not triggered any earlier
-   (e.g. right after the Connect screen) — every field across both screens is collected
+   (e.g. right after the Connect screen) — every field across all three screens is collected
    *before* the TV is ever contacted, so nothing pops a PIN on the TV's screen until the user
    has answered everything and there's exactly one /ha_pair/complete payload to send, instead
    of an initial one plus a follow-up settings update that could fail on its own.
-4. The user reads the PIN off the TV and types it into the form shown here (async_step_pin).
-5. This flow mints a fresh Long-Lived Access Token for the instance owner (see
+5. The user reads the PIN off the TV and types it into the form shown here (async_step_pin).
+6. This flow mints a fresh Long-Lived Access Token for the instance owner (see
    _async_mint_token below), and POSTs {pin, host, token, mqtt_topic_prefix,
    subscribe_to_frigate_events, register_companion_app, companion_device_name,
    alert_position, alert_size, alert_duration_seconds, play_clips_inline,
@@ -199,17 +203,31 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_alert_settings(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Collect alert appearance and history settings, then start pairing.
-
-        Submitting this step (not the Connect screen) is what actually contacts the TV — see
-        this module's own doc comment for why that's deliberate.
-        """
-        errors: dict[str, str] = {}
+        """Collect alert appearance settings, then move on to history settings."""
         if user_input is not None:
             self._alert_position = user_input[CONF_ALERT_POSITION]
             self._alert_size = user_input[CONF_ALERT_SIZE]
             self._alert_duration_seconds = user_input[CONF_ALERT_DURATION_SECONDS]
             self._play_clips_inline = user_input[CONF_PLAY_CLIPS_INLINE]
+            return await self.async_step_history_settings()
+
+        return self.async_show_form(
+            step_id="alert_settings",
+            data_schema=self._alert_settings_schema(user_input),
+            description_placeholders={"name": self._device_name or self._host or ""},
+        )
+
+    async def async_step_history_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Collect history settings, then start pairing.
+
+        Submitting this step (not either screen before it) is what actually contacts the TV
+        — see this module's own doc comment for why that's deliberate, and why history
+        settings specifically are what this is attached to rather than alert_settings.
+        """
+        errors: dict[str, str] = {}
+        if user_input is not None:
             self._save_all_notifications = user_input[CONF_SAVE_ALL_NOTIFICATIONS]
             self._history_size = user_input[CONF_HISTORY_SIZE]
 
@@ -218,8 +236,8 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_pin()
 
         return self.async_show_form(
-            step_id="alert_settings",
-            data_schema=self._alert_settings_schema(user_input),
+            step_id="history_settings",
+            data_schema=self._history_settings_schema(user_input),
             errors=errors,
             description_placeholders={"name": self._device_name or self._host or ""},
         )
@@ -283,7 +301,15 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_PLAY_CLIPS_INLINE,
                     default=defaults.get(CONF_PLAY_CLIPS_INLINE, DEFAULT_PLAY_CLIPS_INLINE),
                 ): bool,
-                # History — same options as the TV's own History card.
+            }
+        )
+
+    @staticmethod
+    def _history_settings_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+        defaults = defaults or {}
+        return vol.Schema(
+            {
+                # Same options as the TV's own History card.
                 vol.Required(
                     CONF_SAVE_ALL_NOTIFICATIONS,
                     default=defaults.get(

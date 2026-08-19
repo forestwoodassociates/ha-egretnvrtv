@@ -24,13 +24,19 @@
         }
       },
       "alert_settings": {
-        "title": "Alert appearance & history",
-        "description": "How alerts should look on \"{name}\", and how much notification history to keep.",
+        "title": "Alert appearance",
+        "description": "How alerts should look on \"{name}\".",
         "data": {
           "alert_position": "Alert position on screen",
           "alert_size": "Alert text/image size",
           "alert_duration_seconds": "Alert duration (seconds)",
-          "play_clips_inline": "Play video clips inline in the alert popup (instead of full-screen). Pressing arrow up will switch to fullscreen during playback",
+          "play_clips_inline": "Play video clips inline in the alert popup (instead of full-screen). Pressing arrow up will switch to fullscreen during playback"
+        }
+      },
+      "history_settings": {
+        "title": "Notification history",
+        "description": "How much notification history \"{name}\" should keep. Submitting this starts pairing — the TV will show a code on screen next.",
+        "data": {
           "save_all_notifications": "Save every notification to history (not just ones with a stable event ID that Frigate provides)",
           "history_size": "Notification history size to keep"
         }
