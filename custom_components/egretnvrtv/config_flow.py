@@ -346,12 +346,20 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_ALERT_SIZE,
                     default=defaults.get(CONF_ALERT_SIZE, DEFAULT_ALERT_SIZE),
                 ): vol.In(ALERT_SIZE_OPTIONS),
+                # vol.Coerce(int) first: a plain vol.In() over an int list, with no explicit
+                # selector, can round-trip through the frontend as a string — harmless for the
+                # TV (org.json's optInt() parses a numeric string just fine) but it means the
+                # *stored* value in this entry's data could be a str, and vol.In() itself
+                # doesn't coerce, only validates membership. That silently breaks pre-selecting
+                # the right option next time this same form (e.g. Reconfigure) is redisplayed
+                # with that stored value as the default — "20" != 20, so nothing matches.
+                # Coercing first guarantees an int actually gets stored, so redisplay works.
                 vol.Required(
                     CONF_ALERT_DURATION_SECONDS,
                     default=defaults.get(
                         CONF_ALERT_DURATION_SECONDS, DEFAULT_ALERT_DURATION_SECONDS
                     ),
-                ): vol.In(ALERT_DURATION_OPTIONS),
+                ): vol.All(vol.Coerce(int), vol.In(ALERT_DURATION_OPTIONS)),
                 vol.Required(
                     CONF_PLAY_CLIPS_INLINE,
                     default=defaults.get(CONF_PLAY_CLIPS_INLINE, DEFAULT_PLAY_CLIPS_INLINE),
@@ -371,10 +379,12 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_SAVE_ALL_NOTIFICATIONS, DEFAULT_SAVE_ALL_NOTIFICATIONS
                     ),
                 ): bool,
+                # See CONF_ALERT_DURATION_SECONDS's own comment above for why vol.Coerce(int)
+                # comes first.
                 vol.Required(
                     CONF_HISTORY_SIZE,
                     default=defaults.get(CONF_HISTORY_SIZE, DEFAULT_HISTORY_SIZE),
-                ): vol.In(HISTORY_SIZE_OPTIONS),
+                ): vol.All(vol.Coerce(int), vol.In(HISTORY_SIZE_OPTIONS)),
             }
         )
 
