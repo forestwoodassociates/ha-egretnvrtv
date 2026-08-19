@@ -49,7 +49,7 @@ import voluptuous as vol
 
 from homeassistant.auth.models import TOKEN_TYPE_LONG_LIVED_ACCESS_TOKEN
 from homeassistant.components import webhook
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.network import NoURLAvailableError, get_url
@@ -88,6 +88,7 @@ from .const import (
     HISTORY_SIZE_OPTIONS,
     PAIR_COMPLETE_PATH,
     PAIR_START_PATH,
+    PAIR_STATUS_PATH,
     PAIR_UPDATE_PATH,
     REQUEST_TIMEOUT_SECONDS,
 )
@@ -210,6 +211,7 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
+        is_first_display = user_input is None
 
         if user_input is not None:
             session = async_get_clientsession(self.hass)
@@ -238,14 +240,42 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_update_reload_and_abort(entry, data_updates=user_input)
 
+        # Only fetched on the very first display, not on a redisplay-after-error (where
+        # user_input already holds exactly what the user just tried, and re-fetching would
+        # just throw that away). Prefer the TV's own live values over this entry's cached
+        # data.get() equivalent — the two can drift if the TV's settings were changed locally
+        # since the last successful pairing/reconfigure.
+        defaults = await self._async_fetch_current_status(entry) if is_first_display else None
+        if defaults is None:
+            defaults = user_input or entry.data
+
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=self._reconfigure_schema(user_input or entry.data),
+            data_schema=self._reconfigure_schema(defaults),
             errors=errors,
             description_placeholders={
                 "name": entry.data.get(CONF_DEVICE_NAME) or entry.title
             },
         )
+
+    async def _async_fetch_current_status(self, entry: ConfigEntry) -> dict[str, Any] | None:
+        """GETs the TV's own live settings (see NotificationHttpServer's /ha_pair/status
+        route) — best-effort; returns None on any failure so the caller falls back to this
+        entry's own cached data instead."""
+        session = async_get_clientsession(self.hass)
+        try:
+            async with session.get(
+                f"http://{entry.data[CONF_HOST]}:{entry.data[CONF_PORT]}{PAIR_STATUS_PATH}",
+                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS),
+            ) as resp:
+                resp.raise_for_status()
+                return await resp.json()
+        except (aiohttp.ClientError, TimeoutError) as err:
+            _LOGGER.debug(
+                "Could not fetch current status from %s:%s: %s",
+                entry.data[CONF_HOST], entry.data[CONF_PORT], err,
+            )
+            return None
 
     def _capture_connect_input(self, user_input: dict[str, Any]) -> None:
         self._mqtt_topic_prefix = user_input[CONF_MQTT_TOPIC_PREFIX]

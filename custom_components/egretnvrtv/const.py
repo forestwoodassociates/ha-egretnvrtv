@@ -123,6 +123,11 @@ PAIR_COMPLETE_PATH = "/ha_pair/complete"
 # no PIN involved, see EgretNvrTvConfigFlow.async_step_reconfigure()'s own doc comment.
 PAIR_UPDATE_PATH = "/ha_pair/update"
 
+# Same Reconfigure flow, read instead of write — fetched before its form is shown, so it can
+# pre-fill with the TV's actual current values instead of this entry's own possibly-stale
+# cached data.
+PAIR_STATUS_PATH = "/ha_pair/status"
+
 # TV-side route the lock switch pushes its state to for an immediate effect — see switch.py.
 LOCK_CONFIG_PATH = "/ha_lock_config"
 
