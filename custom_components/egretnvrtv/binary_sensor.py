@@ -95,8 +95,13 @@ class EgretNvrTvBinarySensor(BinarySensorEntity):
         )
 
     @property
-    def is_on(self) -> bool | None:
-        return self._values.get(self.entity_description.key)
+    def is_on(self) -> bool:
+        # False (not None) until the TV's first diagnostics webhook arrives — a paired TV
+        # that hasn't reported in yet is indistinguishable from one that has reported "not
+        # connected", and defaulting to False avoids every one of these showing as a
+        # grey/unhelpful "Unknown" state on first setup (or after HA restarts and the TV
+        # hasn't posted since).
+        return bool(self._values.get(self.entity_description.key))
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(
