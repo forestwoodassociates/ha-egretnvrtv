@@ -13,6 +13,14 @@ CONF_DEVICE_NAME = "device_name"
 CONF_MQTT_TOPIC_PREFIX = "mqtt_topic_prefix"
 DEFAULT_MQTT_TOPIC_PREFIX = "frigate"
 
+# Frigate's own MQTT client_id (config["mqtt"]["client_id"]) — auto-discovered the same way
+# as the topic prefix above (see config_flow.py's _discover_frigate_mqtt_client_id()) and
+# pushed to the TV on every pairing/reconfigure, even though it's not yet surfaced anywhere
+# in this integration's own UI (no form field, no default) and the TV app doesn't act on it
+# yet either. Pushed ahead of that TV-side support specifically so it's already flowing by
+# the time that support exists, with no further integration-side change needed then.
+CONF_MQTT_CLIENT_ID = "mqtt_client_id"
+
 # Whether to also register the TV as a Home Assistant "mobile_app" companion device (so it
 # shows up as a selectable notify target in blueprints) — the same optional step the TV's own
 # setup wizard offers, collected here instead so it's a checkbox instead of on-device typing.

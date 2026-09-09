@@ -67,6 +67,7 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_DEVICE_NAME,
     CONF_HISTORY_SIZE,
+    CONF_MQTT_CLIENT_ID,
     CONF_MQTT_TOPIC_PREFIX,
     CONF_PLAY_CLIPS_INLINE,
     CONF_REGISTER_COMPANION_APP,
@@ -174,7 +175,10 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=self._connect_schema(
                 {CONF_COMPANION_DEVICE_NAME: self._default_companion_device_name()}
             ),
-            description_placeholders={"name": self._device_name or self._host or ""},
+            description_placeholders={
+                "name": self._device_name or self._host or "",
+                "topic_prefix_note": self._topic_prefix_autodiscovery_note(None),
+            },
         )
 
     async def async_step_user(
@@ -192,6 +196,9 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=self._user_schema(
                 {CONF_COMPANION_DEVICE_NAME: self._default_companion_device_name()}
             ),
+            description_placeholders={
+                "topic_prefix_note": self._topic_prefix_autodiscovery_note(None),
+            },
         )
 
     async def async_step_reconfigure(
@@ -220,6 +227,7 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                     f"http://{entry.data[CONF_HOST]}:{entry.data[CONF_PORT]}{PAIR_UPDATE_PATH}",
                     json={
                         CONF_MQTT_TOPIC_PREFIX: user_input[CONF_MQTT_TOPIC_PREFIX],
+                        CONF_MQTT_CLIENT_ID: self._discover_frigate_mqtt_client_id(),
                         CONF_SUBSCRIBE_TO_FRIGATE_EVENTS: user_input[CONF_SUBSCRIBE_TO_FRIGATE_EVENTS],
                         CONF_ALERT_POSITION: user_input[CONF_ALERT_POSITION],
                         CONF_ALERT_SIZE: user_input[CONF_ALERT_SIZE],
@@ -254,7 +262,8 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=self._reconfigure_schema(defaults),
             errors=errors,
             description_placeholders={
-                "name": entry.data.get(CONF_DEVICE_NAME) or entry.title
+                "name": entry.data.get(CONF_DEVICE_NAME) or entry.title,
+                "topic_prefix_note": self._topic_prefix_autodiscovery_note(defaults),
             },
         )
 
@@ -327,14 +336,15 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"name": self._device_name or self._host or ""},
         )
 
-    @staticmethod
-    def _connect_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+    def _connect_schema(self, defaults: dict[str, Any] | None = None) -> vol.Schema:
         defaults = defaults or {}
         return vol.Schema(
             {
                 vol.Required(
                     CONF_MQTT_TOPIC_PREFIX,
-                    default=defaults.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+                    default=defaults.get(CONF_MQTT_TOPIC_PREFIX)
+                    or self._discover_frigate_mqtt_topic_prefix()
+                    or DEFAULT_MQTT_TOPIC_PREFIX,
                 ): str,
                 # Leave unchecked if a "Notifications for Android TV" blueprint is already
                 # pushing to this TV — enabling both shows every event twice, same warning the
@@ -420,8 +430,7 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
             }
         )
 
-    @classmethod
-    def _reconfigure_schema(cls, defaults: dict[str, Any] | None = None) -> vol.Schema:
+    def _reconfigure_schema(self, defaults: dict[str, Any] | None = None) -> vol.Schema:
         # One combined screen, unlike the alert_settings/history_settings split above — that
         # split exists specifically so a pairing error doesn't require scrolling past a wall
         # of fields to see, which doesn't apply here (no PIN step, and any /ha_pair/update
@@ -430,7 +439,9 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
         schema = {
             vol.Required(
                 CONF_MQTT_TOPIC_PREFIX,
-                default=defaults.get(CONF_MQTT_TOPIC_PREFIX, DEFAULT_MQTT_TOPIC_PREFIX),
+                default=defaults.get(CONF_MQTT_TOPIC_PREFIX)
+                or self._discover_frigate_mqtt_topic_prefix()
+                or DEFAULT_MQTT_TOPIC_PREFIX,
             ): str,
             vol.Required(
                 CONF_SUBSCRIBE_TO_FRIGATE_EVENTS,
@@ -439,19 +450,83 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                 ),
             ): bool,
         }
-        schema.update(cls._alert_settings_schema(defaults).schema)
-        schema.update(cls._history_settings_schema(defaults).schema)
+        schema.update(self._alert_settings_schema(defaults).schema)
+        schema.update(self._history_settings_schema(defaults).schema)
         return vol.Schema(schema)
 
-    @classmethod
-    def _user_schema(cls, defaults: dict[str, Any] | None = None) -> vol.Schema:
+    def _user_schema(self, defaults: dict[str, Any] | None = None) -> vol.Schema:
         defaults = defaults or {}
         schema = {
             vol.Required(CONF_HOST, default=defaults.get(CONF_HOST, "")): str,
             vol.Required(CONF_PORT, default=defaults.get(CONF_PORT, DEFAULT_PORT)): int,
         }
-        schema.update(cls._connect_schema(defaults).schema)
+        schema.update(self._connect_schema(defaults).schema)
         return vol.Schema(schema)
+
+    def _read_frigate_mqtt_config_value(self, key: str) -> str | None:
+        """Best-effort read of a single key out of frigate-hass-integration's own already-
+        loaded runtime config (hass.data["frigate"][entry_id]["config"]["mqtt"][key]) — the
+        exact same config Frigate's own /api/config exposes (confirmed by reading that
+        integration's own diagnostics.py, which publishes this same dict verbatim), just
+        reached directly since this integration runs as real Home Assistant code with no
+        REST/token involved at all — unlike Home Assistant's own diagnostics-download
+        endpoint, which would need the paired TV's own access token to belong to an admin
+        user. Shared by _discover_frigate_mqtt_topic_prefix() and
+        _discover_frigate_mqtt_client_id() below, since both read this exact same nested path
+        and only differ in which key they want.
+
+        Silently None on anything unexpected — the Frigate integration not installed, not yet
+        finished its own setup, more than one Frigate instance configured (picks the first,
+        same "single instance" assumption the rest of this integration already makes), or a
+        future frigate-hass-integration version restructuring this internal shape, which this
+        integration has no actual contract with (it's reading another integration's private
+        runtime state, not a documented API).
+        """
+        try:
+            frigate_entries = self.hass.config_entries.async_entries("frigate")
+            frigate_data = self.hass.data.get("frigate", {})
+            for entry in frigate_entries:
+                config = frigate_data.get(entry.entry_id, {}).get("config", {})
+                value = config.get("mqtt", {}).get(key)
+                if value:
+                    return str(value)
+        except Exception:  # noqa: BLE001 - reading another integration's undocumented internals
+            _LOGGER.debug("Could not read Frigate's own mqtt.%s", key, exc_info=True)
+        return None
+
+    def _discover_frigate_mqtt_topic_prefix(self) -> str | None:
+        """Only ever used to pick a better *default* for the form field below —
+        CONF_MQTT_TOPIC_PREFIX stays a plain free-text field the user can still override, and
+        this never overrides an already-known value (a previously-saved entry, or whatever
+        the user just typed before a validation error redisplayed the form)."""
+        return self._read_frigate_mqtt_config_value("topic_prefix")
+
+    def _discover_frigate_mqtt_client_id(self) -> str | None:
+        """Frigate's own MQTT client_id — the same id its own websocket API expects as
+        `instance_id` for commands like `frigate/reviews/viewed` once more than one Frigate
+        instance is bridged into this Home Assistant (see the TV app's own
+        FrigateReviewActionClient for the side that would eventually consume this). Pushed to
+        the TV on every pairing/reconfigure (see CONF_MQTT_CLIENT_ID's own comment in
+        const.py) even though nothing reads it back yet — there's no persisted/user-editable
+        value to prefer here the way there is for the topic prefix, so this is always a fresh
+        re-read rather than something threaded through a form default."""
+        return self._read_frigate_mqtt_config_value("client_id")
+
+    def _topic_prefix_autodiscovery_note(self, defaults: dict[str, Any] | None) -> str:
+        """Note appended to the connect/reconfigure step description when the MQTT topic
+        prefix field below is about to be pre-filled from Frigate's own config, so the user
+        knows why it's already filled in instead of wondering whether it's just the plain
+        hardcoded default. Mirrors _connect_schema/_reconfigure_schema's own
+        `defaults.get(...) or discover() or DEFAULT` precedence exactly, so this only ever
+        describes what's really driving the field — blank whenever a previously-saved value
+        wins instead (nothing new to call out), or discovery found nothing.
+        """
+        if (defaults or {}).get(CONF_MQTT_TOPIC_PREFIX):
+            return ""
+        discovered = self._discover_frigate_mqtt_topic_prefix()
+        if discovered:
+            return f" Detected \"{discovered}\" from your Frigate integration below — override it if needed."
+        return ""
 
     def _default_companion_device_name(self) -> str:
         """Suggests "Egret NVR TV", or "Egret NVR TV 2"/"3"/... if that name is already
@@ -589,6 +664,7 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                     "token": token,
                     "webhook_id": self._webhook_id,
                     "mqtt_topic_prefix": self._mqtt_topic_prefix,
+                    "mqtt_client_id": self._discover_frigate_mqtt_client_id(),
                     "subscribe_to_frigate_events": self._subscribe_to_frigate_events,
                     "register_companion_app": self._register_companion_app,
                     "companion_device_name": self._companion_device_name,

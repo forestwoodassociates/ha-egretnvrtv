@@ -3,22 +3,22 @@
     "step": {
       "zeroconf_confirm": {
         "title": "Set up Egret NVR TV",
-        "description": "Found \"{name}\" on your network.",
+        "description": "Found \"{name}\" on your network.{topic_prefix_note}",
         "data": {
           "mqtt_topic_prefix": "Frigate MQTT topic prefix (leave default unless you changed it in Frigate's own config)",
-          "subscribe_to_frigate_events": "Subscribe to Frigate events (leave unchecked if a \"Notifications for Android TV\" blueprint already pushes to this TV — enabling both shows every event twice)",
+          "subscribe_to_frigate_events": "Subscribe to Frigate events (leave unchecked if a \"Notifications for Android TV\" blueprint, or a mobile app notification pushed to this TV's companion app registration, already does — enabling more than one shows every event twice)",
           "register_companion_app": "Register as a Home Assistant companion app (lets it show up as a notify target in blueprints)",
           "companion_device_name": "Companion app device name (only used if registering above)"
         }
       },
       "user": {
         "title": "Set up Egret NVR TV",
-        "description": "Enter the TV's address if it wasn't found automatically.",
+        "description": "Enter the TV's address if it wasn't found automatically.{topic_prefix_note}",
         "data": {
           "host": "Host or IP address",
           "port": "Port",
           "mqtt_topic_prefix": "Frigate MQTT topic prefix (leave default unless you changed it in Frigate's own config)",
-          "subscribe_to_frigate_events": "Subscribe to Frigate events (leave unchecked if a \"Notifications for Android TV\" blueprint already pushes to this TV or you plan on using the companion app support for notification — enabling both shows every event twice)",
+          "subscribe_to_frigate_events": "Subscribe to Frigate events (leave unchecked if a \"Notifications for Android TV\" blueprint, or a mobile app notification pushed to this TV's companion app registration, already does — enabling more than one shows every event twice)",
           "register_companion_app": "Register as a Home Assistant companion app (lets it show up as a notify target in blueprints)",
           "companion_device_name": "Companion app device name (only used if registering above)"
         }
@@ -50,10 +50,10 @@
       },
       "reconfigure": {
         "title": "Update Egret NVR TV settings",
-        "description": "Update settings for \"{name}\" — no pairing code needed, this TV already trusts this Home Assistant instance.",
+        "description": "Update settings for \"{name}\" — no pairing code needed, this TV already trusts this Home Assistant instance.{topic_prefix_note}",
         "data": {
           "mqtt_topic_prefix": "Frigate MQTT topic prefix (leave default unless you changed it in Frigate's own config)",
-          "subscribe_to_frigate_events": "Subscribe to Frigate events (leave unchecked if a \"Notifications for Android TV\" blueprint already pushes to this TV — enabling both shows every event twice)",
+          "subscribe_to_frigate_events": "Subscribe to Frigate events (leave unchecked if a \"Notifications for Android TV\" blueprint, or a mobile app notification pushed to this TV's companion app registration, already does — enabling more than one shows every event twice)",
           "alert_position": "Alert position on screen",
           "alert_size": "Alert text/image size",
           "alert_duration_seconds": "Alert duration (seconds)",
