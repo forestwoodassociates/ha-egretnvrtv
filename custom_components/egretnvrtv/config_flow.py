@@ -29,7 +29,7 @@ Pairing exchange (see the TV app's NotificationHttpServer.java for the other sid
    _async_mint_token below), and POSTs {pin, host, token, mqtt_topic_prefix,
    subscribe_to_frigate_events, register_companion_app, companion_device_name,
    alert_position, alert_size, alert_duration_seconds, play_clips_inline,
-   save_all_notifications, history_size} to the TV's `/ha_pair/complete`. The TV only accepts
+   save_all_notifications, history_days} to the TV's `/ha_pair/complete`. The TV only accepts
    this if the PIN matches what it's still showing and hasn't expired — that PIN is the
    entire proof that whoever is submitting this form is physically looking at the right TV,
    since the pairing endpoint itself has no other auth. On success the TV saves the
@@ -53,6 +53,11 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResu
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.network import NoURLAvailableError, get_url
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+)
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .const import (
@@ -66,6 +71,7 @@ from .const import (
     CONF_COMPANION_DEVICE_NAME,
     CONF_DEVICE_ID,
     CONF_DEVICE_NAME,
+    CONF_HISTORY_DAYS,
     CONF_HISTORY_SIZE,
     CONF_MQTT_CLIENT_ID,
     CONF_MQTT_TOPIC_PREFIX,
@@ -78,7 +84,7 @@ from .const import (
     DEFAULT_ALERT_POSITION,
     DEFAULT_ALERT_SIZE,
     DEFAULT_COMPANION_DEVICE_NAME_BASE,
-    DEFAULT_HISTORY_SIZE,
+    DEFAULT_HISTORY_DAYS,
     DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_PLAY_CLIPS_INLINE,
     DEFAULT_PORT,
@@ -86,12 +92,15 @@ from .const import (
     DEFAULT_SAVE_ALL_NOTIFICATIONS,
     DEFAULT_SUBSCRIBE_TO_FRIGATE_EVENTS,
     DOMAIN,
-    HISTORY_SIZE_OPTIONS,
+    MAX_HISTORY_DAYS,
+    MIN_HISTORY_DAYS,
     PAIR_COMPLETE_PATH,
     PAIR_START_PATH,
     PAIR_STATUS_PATH,
     PAIR_UPDATE_PATH,
     REQUEST_TIMEOUT_SECONDS,
+    history_days_from,
+    legacy_history_size_from_days,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -123,7 +132,7 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
         self._alert_duration_seconds: str = DEFAULT_ALERT_DURATION_SECONDS
         self._play_clips_inline: bool = DEFAULT_PLAY_CLIPS_INLINE
         self._save_all_notifications: bool = DEFAULT_SAVE_ALL_NOTIFICATIONS
-        self._history_size: str = DEFAULT_HISTORY_SIZE
+        self._history_days: int = DEFAULT_HISTORY_DAYS
         self._webhook_id: str | None = None
 
     async def async_step_zeroconf(
@@ -221,6 +230,9 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
         is_first_display = user_input is None
 
         if user_input is not None:
+            # The slider hands back a float (e.g. 7.0) — stored and sent as a whole number.
+            history_days = history_days_from(user_input)
+            user_input = {**user_input, CONF_HISTORY_DAYS: history_days}
             session = async_get_clientsession(self.hass)
             try:
                 async with session.post(
@@ -234,7 +246,10 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_ALERT_DURATION_SECONDS: user_input[CONF_ALERT_DURATION_SECONDS],
                         CONF_PLAY_CLIPS_INLINE: user_input[CONF_PLAY_CLIPS_INLINE],
                         CONF_SAVE_ALL_NOTIFICATIONS: user_input[CONF_SAVE_ALL_NOTIFICATIONS],
-                        CONF_HISTORY_SIZE: user_input[CONF_HISTORY_SIZE],
+                        CONF_HISTORY_DAYS: history_days,
+                        # For a TV app that predates day-based history — see
+                        # legacy_history_size_from_days().
+                        CONF_HISTORY_SIZE: legacy_history_size_from_days(history_days),
                     },
                     timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS),
                 ) as resp:
@@ -323,7 +338,7 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             self._save_all_notifications = user_input[CONF_SAVE_ALL_NOTIFICATIONS]
-            self._history_size = user_input[CONF_HISTORY_SIZE]
+            self._history_days = history_days_from(user_input)
 
             errors = await self._async_start_pairing()
             if not errors:
@@ -421,12 +436,22 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_SAVE_ALL_NOTIFICATIONS, DEFAULT_SAVE_ALL_NOTIFICATIONS
                     ),
                 ): bool,
-                # See CONF_ALERT_DURATION_SECONDS's own comment above for why this is
-                # string-valued and wrapped in str().
+                # Days, matching the TV's own History slider. defaults may be this entry's
+                # data, the TV's /ha_pair/status response, or a redisplayed form — any of
+                # which can still carry only the old history_size count instead
+                # (see history_days_from()).
                 vol.Required(
-                    CONF_HISTORY_SIZE,
-                    default=str(defaults.get(CONF_HISTORY_SIZE, DEFAULT_HISTORY_SIZE)),
-                ): vol.In(HISTORY_SIZE_OPTIONS),
+                    CONF_HISTORY_DAYS,
+                    default=history_days_from(defaults),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=MIN_HISTORY_DAYS,
+                        max=MAX_HISTORY_DAYS,
+                        step=1,
+                        mode=NumberSelectorMode.SLIDER,
+                        unit_of_measurement="days",
+                    )
+                ),
             }
         )
 
@@ -608,7 +633,7 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_ALERT_DURATION_SECONDS: self._alert_duration_seconds,
                         CONF_PLAY_CLIPS_INLINE: self._play_clips_inline,
                         CONF_SAVE_ALL_NOTIFICATIONS: self._save_all_notifications,
-                        CONF_HISTORY_SIZE: self._history_size,
+                        CONF_HISTORY_DAYS: self._history_days,
                     },
                 )
             if errors.get("base") == ERROR_INVALID_PIN:
@@ -673,7 +698,10 @@ class EgretNvrTvConfigFlow(ConfigFlow, domain=DOMAIN):
                     "alert_duration_seconds": self._alert_duration_seconds,
                     "play_clips_inline": self._play_clips_inline,
                     "save_all_notifications": self._save_all_notifications,
-                    "history_size": self._history_size,
+                    "history_days": self._history_days,
+                    # For a TV app that predates day-based history — see
+                    # legacy_history_size_from_days().
+                    "history_size": legacy_history_size_from_days(self._history_days),
                 },
                 timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS),
             ) as resp:

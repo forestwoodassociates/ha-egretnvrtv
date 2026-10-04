@@ -1,5 +1,9 @@
 """Constants for the Egret NVR TV integration."""
 
+from __future__ import annotations
+
+from typing import Any
+
 DOMAIN = "egretnvrtv"
 
 # Matches the service type the TV app advertises via Android's NsdManager — see
@@ -74,10 +78,49 @@ DEFAULT_PLAY_CLIPS_INLINE = False
 CONF_SAVE_ALL_NOTIFICATIONS = "save_all_notifications"
 DEFAULT_SAVE_ALL_NOTIFICATIONS = False
 
-# String-valued for the same reason as ALERT_DURATION_OPTIONS above.
+# How many days of notification history the TV keeps (1-30) — mirrors
+# HistoryPreferences.getHistoryDays() in the app. Sent as a plain int.
+CONF_HISTORY_DAYS = "history_days"
+MIN_HISTORY_DAYS = 1
+MAX_HISTORY_DAYS = 30
+DEFAULT_HISTORY_DAYS = 7
+
+# The count-based setting history_days replaced. Still read from config entries and TVs
+# saved before the change (converted with history_days_from_legacy_size()), and still sent
+# alongside history_days so a TV app that predates day-based history keeps a sensible count.
 CONF_HISTORY_SIZE = "history_size"
-HISTORY_SIZE_OPTIONS = ["100", "250", "500", "750", "1000"]
-DEFAULT_HISTORY_SIZE = "100"
+
+
+def history_days_from_legacy_size(history_size: Any) -> int:
+    """Converts the old notification count to days the same way the app does
+    (HistoryPreferences.daysFromLegacyHistorySize()): 500 or fewer is 7 days, more is 14."""
+    try:
+        size = int(float(history_size))
+    except (TypeError, ValueError):
+        return DEFAULT_HISTORY_DAYS
+    return 7 if size <= 500 else 14
+
+
+def legacy_history_size_from_days(days: int) -> int:
+    """The reverse, for a TV app that only understands history_size — mirrors
+    HistoryPreferences.legacyHistorySizeFromDays(): 500 for up to 7 days, 1000 above."""
+    return 500 if days <= 7 else 1000
+
+
+def history_days_from(values: dict[str, Any] | None) -> int:
+    """The history days in a config entry's data, a /ha_pair/status response, or form input —
+    falling back to a legacy history_size, then the default — clamped to 1-30."""
+    values = values or {}
+    if values.get(CONF_HISTORY_DAYS) is not None:
+        try:
+            days = int(float(values[CONF_HISTORY_DAYS]))
+        except (TypeError, ValueError):
+            days = DEFAULT_HISTORY_DAYS
+    elif values.get(CONF_HISTORY_SIZE) is not None:
+        days = history_days_from_legacy_size(values[CONF_HISTORY_SIZE])
+    else:
+        days = DEFAULT_HISTORY_DAYS
+    return max(MIN_HISTORY_DAYS, min(MAX_HISTORY_DAYS, days))
 
 # The per-config-entry Home Assistant webhook this integration owns, generated during
 # pairing and handed to the TV in the /ha_pair/complete payload — see __init__.py. Distinct
