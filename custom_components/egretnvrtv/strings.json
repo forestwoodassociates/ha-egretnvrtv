@@ -73,5 +73,37 @@
       "already_configured": "This TV is already configured.",
       "reconfigure_successful": "Settings updated."
     }
+  },
+  "services": {
+    "show_camera": {
+      "name": "Show camera",
+      "description": "Shows a camera's live view on the targeted TVs: in the popup for a while, or full screen. Target an area to reach the TV in that room.",
+      "fields": {
+        "camera": {
+          "name": "Camera",
+          "description": "The Frigate camera name (for example driveway), or the camera's name in Home Assistant."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "Popup in the corner of whatever is on screen, or the full-screen live view."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "How long the popup stays up, in seconds. Ignored for full screen."
+        }
+      }
+    },
+    "hide_camera": {
+      "name": "Hide camera",
+      "description": "Closes the live view showing on the targeted TVs, whether the popup or full screen. Target an area to reach the TV in that room."
+    }
+  },
+  "selector": {
+    "mode": {
+      "options": {
+        "popup": "Popup",
+        "fullscreen": "Full screen"
+      }
+    }
   }
 }

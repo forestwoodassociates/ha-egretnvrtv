@@ -1,0 +1,35 @@
+show_camera:
+  target:
+    device:
+      integration: egretnvrtv
+    entity:
+      integration: egretnvrtv
+  fields:
+    camera:
+      required: true
+      example: driveway
+      selector:
+        text:
+    mode:
+      default: popup
+      selector:
+        select:
+          translation_key: mode
+          options:
+            - popup
+            - fullscreen
+    duration:
+      default: 60
+      selector:
+        number:
+          min: 5
+          max: 600
+          unit_of_measurement: seconds
+          mode: box
+
+hide_camera:
+  target:
+    device:
+      integration: egretnvrtv
+    entity:
+      integration: egretnvrtv

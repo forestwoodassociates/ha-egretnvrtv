@@ -194,3 +194,26 @@ REQUEST_TIMEOUT_SECONDS = 10
 # profile UI defaults to the same span) — the TV persists this token indefinitely once
 # paired, same as one a user would have pasted in by hand.
 ACCESS_TOKEN_LIFESPAN_DAYS = 3650
+
+# TV-side route the egretnvrtv.show_camera service calls — see services.py. Unlike the lock
+# route, the TV checks this one's caller: the X-Egret-Webhook-Id header has to carry this
+# entry's own CONF_WEBHOOK_ID, the one secret the TV and this integration share from pairing.
+LIVE_VIEW_PATH = "/live_view"
+LIVE_VIEW_SECRET_HEADER = "X-Egret-Webhook-Id"
+
+LIVE_VIEW_HIDE_PATH = "/live_view/hide"
+
+SERVICE_SHOW_CAMERA = "show_camera"
+SERVICE_HIDE_CAMERA = "hide_camera"
+ATTR_CAMERA = "camera"
+ATTR_MODE = "mode"
+ATTR_DURATION = "duration"
+MODE_POPUP = "popup"
+MODE_FULLSCREEN = "fullscreen"
+DEFAULT_LIVE_VIEW_DURATION_SECONDS = 60
+MIN_LIVE_VIEW_DURATION_SECONDS = 5
+MAX_LIVE_VIEW_DURATION_SECONDS = 600
+
+# The TV answers once it has found the camera's stream (or not), and waits up to 20 seconds
+# for that itself — Home Assistant's own HLS relay can be slow to start.
+LIVE_VIEW_TIMEOUT_SECONDS = 25

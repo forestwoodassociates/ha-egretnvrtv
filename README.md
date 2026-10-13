@@ -42,6 +42,39 @@ Settings → Devices & Services — a discovered TV appears automatically ("Set 
 
 Running setup again for the same TV (e.g. after a factory reset or reinstall) mints a new token and revokes the old one — the previous token stops working the moment the new pairing completes.
 
+## Showing a camera on a TV: `egretnvrtv.show_camera`
+
+Shows a camera's live view on the TVs you target — in a popup over whatever is on screen, or full screen. Requires an Egret NVR TV app version with live-view support (released after 0.9.27); an older app answers with an "update the app" error.
+
+| Field | | |
+|---|---|---|
+| `camera` | required | The Frigate camera name (e.g. `driveway`), or the camera's name in Home Assistant |
+| `mode` | `popup` (default) or `fullscreen` | |
+| `duration` | 5–600 seconds, default 60 | How long the popup stays up; ignored for full screen |
+
+Target a TV's device, or an **area** to reach whichever TV is in that room — assign each TV's device to its area under Settings → Devices & Services. On the TV, OK/Enter turns the popup into the full-screen view and Back closes it.
+
+```yaml
+action: egretnvrtv.show_camera
+target:
+  area_id: living_room
+data:
+  camera: driveway
+  duration: 30
+```
+
+The call fails with the TV's own reason (e.g. no such camera) when no targeted TV could show it, so a script or voice command can report that back.
+
+## Closing it: `egretnvrtv.hide_camera`
+
+Closes whatever live view the targeted TVs are showing — the popup, or a full-screen live view — with the same device/area targeting. A TV with nothing open isn't an error; it only fails when no targeted TV could be reached.
+
+```yaml
+action: egretnvrtv.hide_camera
+target:
+  area_id: living_room
+```
+
 ## Scope
 
-This integration only handles pairing. Once paired, the TV talks to Home Assistant's existing REST/WebSocket APIs on its own — this integration has no ongoing runtime behavior.
+Pairing, the TVs' diagnostic sensors and lock switch, and `egretnvrtv.show_camera`/`hide_camera`. Otherwise, once paired, the TV talks to Home Assistant's existing REST/WebSocket APIs on its own.

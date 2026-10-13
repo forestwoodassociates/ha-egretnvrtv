@@ -9,7 +9,9 @@ Once paired, the TV talks to Home Assistant's existing REST/WebSocket APIs direc
 the token it was given, exactly as if the user had entered it manually. The one thing this
 integration does at runtime is receive that TV's own diagnostic status (last notification,
 last clip played, connection health, ...) over a dedicated webhook and expose it as sensor/
-binary_sensor entities on that TV's device — see sensor.py/binary_sensor.py.
+binary_sensor entities on that TV's device — see sensor.py/binary_sensor.py. It also offers
+an egretnvrtv.show_camera service that shows a camera's live view on the TVs in a target (a
+device or an area) — see services.py.
 """
 from __future__ import annotations
 
@@ -22,8 +24,11 @@ from homeassistant.components import webhook
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.typing import ConfigType
 
+from .services import async_register_services
 from .const import (
     ATTR_LOCKED,
     CONF_WEBHOOK_ID,
@@ -35,6 +40,14 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the integration-wide services — see services.py."""
+    async_register_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
