@@ -1,0 +1,94 @@
+# Voice control for Egret NVR TV: "show the driveway" puts that camera on the TV in the same
+# room as the voice device that heard it. Paste into a new automation (Settings → Automations →
+# ⋮ → Edit in YAML). Needs each TV's device and each voice device assigned to an area.
+#
+#   "show (me) (the) <camera> (camera)"              → popup on this room's TV
+#   "show (me) (the) <camera> (camera) full screen"  → full-screen live view
+#   "hide / close (the) camera"                       → closes it
+#
+# <camera> is matched loosely against your camera entities: case, spaces, "the", a trailing
+# "camera" and "on the TV" don't matter, so "pool room", "right back yard" or "the patio camera"
+# all work.
+alias: "Egret NVR TV: show a camera on this room's TV"
+description: Voice command — shows or hides a camera's live view on the Egret NVR TV in the same area as the voice device.
+mode: parallel
+triggers:
+  - trigger: conversation
+    id: show
+    command:
+      - "show [me] [the] {camera}"
+      - "put [the] {camera} on [the] (TV|screen)"
+      # Some speech-to-text setups prefix who spoke, e.g. "[dave] show me the driveway" — the
+      # built-in intents tolerate that, but a custom sentence has to match the whole text.
+      - "{speaker} show [me] [the] {camera}"
+      - "{speaker} put [the] {camera} on [the] (TV|screen)"
+  - trigger: conversation
+    id: hide
+    command:
+      - "(hide|close) [the] (camera|live view)"
+      - "stop showing [the] camera"
+      - "{speaker} (hide|close) [the] (camera|live view)"
+      - "{speaker} stop showing [the] camera"
+variables:
+  area: "{{ area_id(trigger.device_id) if trigger.device_id else none }}"
+  area_label: "{{ area_name(area) if area else 'this room' }}"
+  # This room's Egret NVR TV devices.
+  tvs: >-
+    {{ (area_devices(area) if area else [])
+       | select('in', integration_entities('egretnvrtv') | map('device_id') | list) | list }}
+  # Lowercased, punctuation dropped ("driveway camera." → "driveway camera").
+  spoken: "{{ (trigger.slots.camera | default('')) | lower | regex_replace('[^a-z0-9 ]', '') | trim }}"
+  fullscreen: "{{ spoken is search('(in )?full ?screen$') }}"
+  camera: >-
+    {%- set s = spoken | regex_replace(' *(in )?full ?screen$', '')
+          | regex_replace(' *on (the )?(tv|screen)$', '') | regex_replace('^the ', '')
+          | regex_replace(' camera$', '') | replace(' ', '') -%}
+    {%- set ns = namespace(match='') -%}
+    {%- for c in states.camera -%}
+      {%- set by_id = c.object_id | regex_replace('_camera$', '') | replace('_', '') -%}
+      {%- set by_name = c.name | lower | regex_replace(' camera$', '') | replace(' ', '') -%}
+      {%- if s and s in [by_id, by_name] and not ns.match -%}
+        {%- set ns.match = c.object_id -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ ns.match }}
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ tvs | count == 0 }}"
+    then:
+      - set_conversation_response: "There's no Egret TV in {{ area_label }}."
+      - stop: No TV in this area
+  - if:
+      - condition: trigger
+        id: hide
+    then:
+      - action: egretnvrtv.hide_camera
+        target:
+          device_id: "{{ tvs }}"
+        continue_on_error: true
+      - set_conversation_response: "Okay."
+      - stop: Hidden
+  - if:
+      - condition: template
+        value_template: "{{ not camera }}"
+    then:
+      - set_conversation_response: "I don't know a camera called {{ spoken }}."
+      - stop: Unknown camera
+  - action: egretnvrtv.show_camera
+    target:
+      device_id: "{{ tvs }}"
+    data:
+      camera: "{{ camera }}"
+      mode: "{{ 'fullscreen' if fullscreen else 'popup' }}"
+    response_variable: result
+    continue_on_error: true
+  - if:
+      - condition: template
+        value_template: "{{ result is defined }}"
+    then:
+      - set_conversation_response: >-
+          Showing the {{ states.camera | selectattr('object_id', 'eq', camera)
+          | map(attribute='name') | first | default(camera) }} camera on the {{ area_label }} TV.
+    else:
+      - set_conversation_response: "Sorry, the {{ area_label }} TV couldn't show that camera."
